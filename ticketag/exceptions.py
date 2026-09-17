@@ -19,3 +19,7 @@ class InferenceError(TickeTagError):
 
 class ClassificationError(TickeTagError):
     """Raised when the model reply cannot be mapped to a valid category."""
+
+
+class KnowledgeBaseError(TickeTagError):
+    """Raised when the vector store cannot be reached or returns invalid data."""
