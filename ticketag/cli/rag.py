@@ -15,7 +15,8 @@ def build_parser() -> argparse.ArgumentParser:
     """Extend the shared parser with the flags only this backend understands."""
     parser = build_base_parser(
         prog="ticketag-rag",
-        description="Classify support tickets by nearest-neighbor vote over a Chroma knowledge base.",
+        description="Classify support tickets by nearest-neighbor vote over a Chroma "
+        "knowledge base.",
         include_categories=False,
     )
     parser.add_argument("--k", type=int, help="Neighbors to retrieve per ticket")
