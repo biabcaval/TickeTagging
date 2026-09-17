@@ -16,6 +16,7 @@ rag = ["chromadb>=1.0"]
 
 [project.scripts]
 ticketag-zeroshot = "ticketag.cli.zeroshot:main"
+ticketag-rag = "ticketag.cli.rag:main"
 
 [dependency-groups]
 dev = ["pytest>=8.0", "ruff>=0.6", "chromadb>=1.0"]
