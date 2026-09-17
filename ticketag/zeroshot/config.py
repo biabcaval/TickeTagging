@@ -8,9 +8,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
+from ..envfile import ENV_FILE, load_env_file
 from ..exceptions import ConfigurationError
 
-ENV_FILE = Path(".env")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 TOKEN_ENV_VAR = "OPENROUTER_API_KEY"
@@ -75,15 +75,3 @@ class Settings:
                 ) from error
         values.update({k: v for k, v in overrides.items() if v is not None})
         return cls(**values)  # type: ignore[arg-type]
-
-
-def load_env_file(env_file: Path = ENV_FILE) -> None:
-    """Load KEY=VALUE pairs from a .env file without overriding real env vars."""
-    if not env_file.is_file():
-        return
-    for line in env_file.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, _, value = stripped.partition("=")
-        os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
