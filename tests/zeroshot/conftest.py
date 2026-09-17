@@ -6,41 +6,40 @@ from ticketag.zeroshot import Settings
 from ticketag.zeroshot.inference import ProviderError
 
 
-class Truncated:
-    """A reply the model cut short once the token budget ran out."""
-
-
 class FakeTransport:
-    """Stands in for the HTTP transport, replaying scripted responses.
+    """Stands in for the Gemini transport, replaying scripted replies.
 
-    A str is a normal reply, a dict is one of OpenRouter's HTTP 200 bodies that
-    carry a provider error instead of choices, and an exception is raised as-is.
+    A str is a normal reply, an Exception is raised as-is, and `None` simulates
+    the model returning no usable text at all (mapped to a retryable ProviderError,
+    matching what `GenAITransport` does for an empty response).
     """
 
-    def __init__(self, *replies: str | dict | Truncated | Exception) -> None:
+    def __init__(self, *replies: str | None | Exception) -> None:
         self.replies = list(replies)
-        self.payloads: list[dict] = []
+        self.calls: list[tuple[str, str, str, dict]] = []
 
-    def send(self, payload: dict) -> dict:
-        self.payloads.append(payload)
+    def send(self, model: str, system_instruction: str, user_content: str, config: dict) -> str:
+        self.calls.append((model, system_instruction, user_content, config))
         reply = self.replies.pop(0) if self.replies else ""
         if isinstance(reply, Exception):
             raise reply
-        if isinstance(reply, dict):
-            return {"error": reply}
-        if isinstance(reply, Truncated):
-            return {"choices": [{"message": {"content": ""}, "finish_reason": "length"}]}
-        return {"choices": [{"message": {"content": reply}, "finish_reason": "stop"}]}
+        if not reply:
+            raise ProviderError(
+                "Model returned an empty reply (finish_reason=None)", retryable=True
+            )
+        return reply
 
 
-def http_error(status_code: int) -> ProviderError:
-    """The error the real transport raises for a non-2xx response."""
-    return ProviderError(f"HTTP {status_code}: boom", status_code)
+def provider_error(
+    status: int, message: str = "boom", *, retryable: bool | None = None
+) -> ProviderError:
+    """The error GenAITransport raises for a failed API call."""
+    return ProviderError(message, status, retryable=retryable)
 
 
 @pytest.fixture
 def settings() -> Settings:
     # backoff_seconds=0.0 and no throttling keep the suite instant.
     return Settings(
-        api_token="sk-or-test", max_retries=3, backoff_seconds=0.0, requests_per_minute=0
+        api_key="test-gemini-key", max_retries=3, backoff_seconds=0.0, requests_per_minute=0
     )

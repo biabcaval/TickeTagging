@@ -1,113 +1,98 @@
+"""Tests for GenAITransport/_read_reply: mapping google-genai responses and failures."""
+
 from __future__ import annotations
 
-import io
-import json
-import urllib.error
+import time
+from types import SimpleNamespace
 
 import pytest
 
-from ticketag.zeroshot.inference import HttpTransport, ProviderError
-
-PAYLOAD = {"model": "vendor/model:free", "messages": [{"role": "user", "content": "hi"}]}
+from ticketag.zeroshot.inference import ProviderError, RateLimiter, _read_reply
 
 
-def fake_urlopen(monkeypatch, handler):
-    """Replace the network call, recording the request the transport built."""
-    sent = {}
-
-    def opener(request, timeout=None):
-        sent["request"] = request
-        sent["timeout"] = timeout
-        return handler()
-
-    monkeypatch.setattr("urllib.request.urlopen", opener)
-    return sent
-
-
-def http_error(status: int, body: bytes) -> urllib.error.HTTPError:
-    return urllib.error.HTTPError(
-        "https://openrouter.ai/api/v1/chat/completions", status, "boom", {}, io.BytesIO(body)
+def response(text: str | None = None, finish_reason: str | None = None, block_reason=None):
+    """Build a minimal stand-in for google.genai.types.GenerateContentResponse."""
+    candidates = None
+    if finish_reason is not None:
+        candidates = [SimpleNamespace(finish_reason=SimpleNamespace(name=finish_reason))]
+    return SimpleNamespace(
+        text=text,
+        candidates=candidates,
+        prompt_feedback=SimpleNamespace(block_reason=block_reason) if block_reason else None,
     )
 
 
-def test_send_posts_json_with_the_bearer_token(settings, monkeypatch):
-    sent = fake_urlopen(monkeypatch, lambda: io.BytesIO(b'{"choices": []}'))
-
-    HttpTransport(settings).send(PAYLOAD)
-
-    request = sent["request"]
-    assert request.full_url == "https://openrouter.ai/api/v1/chat/completions"
-    assert request.get_header("Authorization") == f"Bearer {settings.api_token}"
-    assert request.get_header("Content-type") == "application/json"
-    assert json.loads(request.data) == PAYLOAD
-    assert sent["timeout"] == settings.timeout
+def test_read_reply_returns_the_response_text():
+    assert _read_reply(response(text="ok", finish_reason="STOP")) == "ok"
 
 
-def test_send_returns_the_decoded_response_body(settings, monkeypatch):
-    body = {"choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}]}
-    fake_urlopen(monkeypatch, lambda: io.BytesIO(json.dumps(body).encode()))
-
-    assert HttpTransport(settings).send(PAYLOAD) == body
-
-
-def test_send_marks_a_rate_limit_response_retryable(settings, monkeypatch):
-    body = json.dumps(
-        {"error": {"message": "Provider returned error", "metadata": {"raw": "saturated"}}}
-    ).encode()
-
-    def raise_429():
-        raise http_error(429, body)
-
-    fake_urlopen(monkeypatch, raise_429)
-
+def test_read_reply_raises_a_permanent_error_when_the_prompt_is_blocked():
     with pytest.raises(ProviderError) as caught:
-        HttpTransport(settings).send(PAYLOAD)
+        _read_reply(response(block_reason="SAFETY"))
 
-    assert caught.value.status == 429
-    assert caught.value.retryable
-    assert "saturated" in str(caught.value)
-
-
-def test_send_marks_an_auth_failure_permanent(settings, monkeypatch):
-    def raise_401():
-        raise http_error(401, b'{"error": {"message": "No auth credentials found"}}')
-
-    fake_urlopen(monkeypatch, raise_401)
-
-    with pytest.raises(ProviderError) as caught:
-        HttpTransport(settings).send(PAYLOAD)
-
-    assert caught.value.status == 401
     assert not caught.value.retryable
-    assert "No auth credentials found" in str(caught.value)
+    assert "SAFETY" in str(caught.value)
 
 
-def test_send_falls_back_to_the_raw_body_when_the_error_is_not_json(settings, monkeypatch):
-    def raise_502():
-        raise http_error(502, b"<html>bad gateway</html>")
+def test_read_reply_raises_a_permanent_error_when_the_token_budget_runs_out():
+    with pytest.raises(ProviderError, match="TICKETAG_MAX_TOKENS") as caught:
+        _read_reply(response(text=None, finish_reason="MAX_TOKENS"))
 
-    fake_urlopen(monkeypatch, raise_502)
-
-    with pytest.raises(ProviderError, match="bad gateway"):
-        HttpTransport(settings).send(PAYLOAD)
+    assert not caught.value.retryable
 
 
-def test_send_treats_an_unreachable_endpoint_as_retryable(settings, monkeypatch):
-    def raise_dns():
-        raise urllib.error.URLError("Name or service not known")
-
-    fake_urlopen(monkeypatch, raise_dns)
-
+def test_read_reply_raises_a_permanent_error_for_a_safety_finish_reason():
     with pytest.raises(ProviderError) as caught:
-        HttpTransport(settings).send(PAYLOAD)
+        _read_reply(response(text=None, finish_reason="SAFETY"))
+
+    assert not caught.value.retryable
+
+
+def test_read_reply_raises_a_retryable_error_for_an_empty_reply_that_finished_cleanly():
+    with pytest.raises(ProviderError) as caught:
+        _read_reply(response(text="", finish_reason="STOP"))
 
     assert caught.value.retryable
 
 
-def test_send_treats_malformed_json_as_retryable(settings, monkeypatch):
-    fake_urlopen(monkeypatch, lambda: io.BytesIO(b"not json at all"))
-
+def test_read_reply_raises_a_retryable_error_when_there_are_no_candidates_at_all():
     with pytest.raises(ProviderError) as caught:
-        HttpTransport(settings).send(PAYLOAD)
+        _read_reply(response(text=None))
 
     assert caught.value.retryable
+
+
+def test_provider_error_marks_known_transient_statuses_retryable():
+    assert ProviderError("boom", 429).retryable
+    assert ProviderError("boom", 503).retryable
+
+
+def test_provider_error_marks_other_statuses_permanent():
+    assert not ProviderError("boom", 401).retryable
+    assert not ProviderError("boom", 404).retryable
+
+
+def test_provider_error_respects_an_explicit_retryable_override():
+    assert ProviderError("boom", 200, retryable=True).retryable
+    assert not ProviderError("boom", 429, retryable=False).retryable
+
+
+def test_rate_limiter_spaces_calls_by_the_configured_interval():
+    limiter = RateLimiter(requests_per_minute=1200)  # one call every 50 ms
+
+    start = time.monotonic()
+    for _ in range(3):
+        limiter.wait()
+    elapsed = time.monotonic() - start
+
+    assert elapsed >= 0.09
+
+
+def test_rate_limiter_is_disabled_when_unlimited():
+    limiter = RateLimiter(requests_per_minute=0)
+
+    start = time.monotonic()
+    for _ in range(50):
+        limiter.wait()
+
+    assert time.monotonic() - start < 0.05

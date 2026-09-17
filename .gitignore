@@ -12,4 +12,5 @@ dist/
 .ruff_cache/
 predictions*.csv
 predictions*.json
+test_sample*.csv
 

@@ -3,53 +3,59 @@ from __future__ import annotations
 import pytest
 
 from ticketag.exceptions import ConfigurationError
-from ticketag.zeroshot.config import OPENROUTER_BASE_URL, TOKEN_ENV_VAR, Settings
+from ticketag.zeroshot.config import API_KEY_ENV_VAR, DEFAULT_MODEL, Settings
 
 
-def test_settings_default_to_openrouter():
-    settings = Settings(api_token="sk-or-test")
+def test_settings_default_to_gemini_flash():
+    settings = Settings(api_key="test-key")
 
-    assert settings.base_url == OPENROUTER_BASE_URL
-    assert settings.model.endswith(":free")
+    assert settings.model == DEFAULT_MODEL
+    assert settings.model.startswith("gemini-")
 
 
 def test_settings_from_env_raises_without_a_key(tmp_path, monkeypatch):
-    monkeypatch.delenv(TOKEN_ENV_VAR, raising=False)
+    monkeypatch.delenv(API_KEY_ENV_VAR, raising=False)
 
     with pytest.raises(ConfigurationError, match="Missing API key"):
         Settings.from_env(env_file=tmp_path / "absent.env")
 
 
 def test_settings_from_env_reads_overrides(tmp_path, monkeypatch):
-    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-abc")
+    monkeypatch.setenv(API_KEY_ENV_VAR, "test-key-abc")
     monkeypatch.setenv("TICKETAG_MAX_RETRIES", "5")
 
-    settings = Settings.from_env(env_file=tmp_path / "absent.env", model="custom/model")
+    settings = Settings.from_env(env_file=tmp_path / "absent.env", model="gemini-2.5-pro")
 
-    assert settings.api_token == "sk-or-abc"
-    assert settings.model == "custom/model"
+    assert settings.api_key == "test-key-abc"
+    assert settings.model == "gemini-2.5-pro"
     assert settings.max_retries == 5
 
 
 def test_settings_rejects_unparsable_env_value(tmp_path, monkeypatch):
-    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-abc")
+    monkeypatch.setenv(API_KEY_ENV_VAR, "test-key-abc")
     monkeypatch.setenv("TICKETAG_MAX_RETRIES", "many")
 
     with pytest.raises(ConfigurationError, match="TICKETAG_MAX_RETRIES"):
         Settings.from_env(env_file=tmp_path / "absent.env")
 
 
-def test_settings_parses_fallback_models_from_a_comma_separated_list(tmp_path, monkeypatch):
-    monkeypatch.setenv(TOKEN_ENV_VAR, "sk-or-abc")
-    monkeypatch.setenv("TICKETAG_FALLBACK_MODELS", "a/one:free, b/two:free ,")
+def test_settings_from_env_reads_the_requests_per_minute_and_max_tokens_overrides(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setenv(API_KEY_ENV_VAR, "test-key-abc")
+    monkeypatch.setenv("TICKETAG_REQUESTS_PER_MINUTE", "10")
+    monkeypatch.setenv("TICKETAG_MAX_TOKENS", "500")
 
     settings = Settings.from_env(env_file=tmp_path / "absent.env")
 
-    assert settings.fallback_models == ("a/one:free", "b/two:free")
+    assert settings.requests_per_minute == 10
+    assert settings.max_tokens == 500
 
 
-def test_settings_point_at_another_openai_compatible_endpoint(tmp_path, monkeypatch):
-    monkeypatch.setenv(TOKEN_ENV_VAR, "sk-or-abc")
-    monkeypatch.setenv("TICKETAG_BASE_URL", "https://example.test/v1")
+def test_settings_applies_keyword_overrides_over_the_environment(tmp_path, monkeypatch):
+    monkeypatch.setenv(API_KEY_ENV_VAR, "test-key-abc")
+    monkeypatch.setenv("TICKETAG_MAX_RETRIES", "5")
 
-    assert Settings.from_env(env_file=tmp_path / "absent.env").base_url == "https://example.test/v1"
+    settings = Settings.from_env(env_file=tmp_path / "absent.env", max_retries=1)
+
+    assert settings.max_retries == 1

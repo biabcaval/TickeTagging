@@ -11,6 +11,7 @@ from .exceptions import (
     ConfigurationError,
     EmptyTicketError,
     InferenceError,
+    KnowledgeBaseError,
     TickeTagError,
 )
 from .models import Classification, ClassifiedTicket, FailedTicket
@@ -30,6 +31,7 @@ __all__ = [
     "EmptyTicketError",
     "FailedTicket",
     "InferenceError",
+    "KnowledgeBaseError",
     "TickeTagError",
     "TicketClassificationPipeline",
     "TicketClassifier",

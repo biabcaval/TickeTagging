@@ -9,7 +9,7 @@ from ticketag.rag.config import API_KEY_ENV_VAR, Settings
 def test_settings_default_collection_and_tuning_values():
     settings = Settings(chroma_api_key="ck-test")
 
-    assert settings.collection_name == "ticketag_tickets"
+    assert settings.collection_name == "tickets"
     assert settings.k == 5
     assert settings.auto_add_threshold == pytest.approx(0.8)
     assert settings.chroma_tenant is None

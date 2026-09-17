@@ -13,6 +13,8 @@ def test_index_serves_the_html_page(client):
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     assert "TickeTag" in response.text
+    assert 'value="zeroshot" disabled' in response.text
+    assert "soon" in response.text
 
 
 def test_health_check_reports_ok(client):
@@ -39,7 +41,7 @@ def test_classify_returns_result_via_rag_backend(client, monkeypatch):
     }
 
 
-def test_classify_returns_result_via_zeroshot_backend(client, monkeypatch):
+def test_classify_rejects_the_parked_zeroshot_backend(client, monkeypatch):
     stub = StubClassifier(
         category="Access", justification="asked to reset a password", confidence=0.65
     )
@@ -49,13 +51,9 @@ def test_classify_returns_result_via_zeroshot_backend(client, monkeypatch):
         "/api/classify", json={"text": "I can't log into the VPN", "backend": "zeroshot"}
     )
 
-    assert response.status_code == 200
-    assert response.json() == {
-        "category": "Access",
-        "justification": "asked to reset a password",
-        "confidence": 0.65,
-        "backend": "zeroshot",
-    }
+    assert response.status_code == 403
+    assert "parked" in response.json()["detail"].lower()
+    assert stub.received == []
 
 
 def test_classify_calls_the_backend_matching_the_request(client, monkeypatch):
@@ -99,20 +97,16 @@ def test_classify_maps_configuration_error_to_a_clean_response(client, monkeypat
     }
 
 
-def test_classify_keeps_the_other_backend_usable_after_one_fails(client, monkeypatch):
-    def _raise_missing_key():
-        raise ConfigurationError("Missing API key")
+def test_classify_keeps_rag_usable_after_a_rejected_zeroshot_request(client, monkeypatch):
+    rag_stub = StubClassifier(category="Hardware", justification="rag reason", confidence=0.7)
+    monkeypatch.setattr("ticketag.webui.app.rag_classifier_from_env", lambda: rag_stub)
 
-    zeroshot_stub = StubClassifier(category="Access", justification="zs reason", confidence=0.6)
-    monkeypatch.setattr("ticketag.webui.app.rag_classifier_from_env", _raise_missing_key)
-    monkeypatch.setattr("ticketag.webui.app.zeroshot_classifier_from_env", lambda: zeroshot_stub)
+    rejected = client.post("/api/classify", json={"text": "ticket text", "backend": "zeroshot"})
+    succeeded = client.post("/api/classify", json={"text": "ticket text", "backend": "rag"})
 
-    failed = client.post("/api/classify", json={"text": "ticket text", "backend": "rag"})
-    succeeded = client.post("/api/classify", json={"text": "ticket text", "backend": "zeroshot"})
-
-    assert failed.status_code == 503
+    assert rejected.status_code == 403
     assert succeeded.status_code == 200
-    assert succeeded.json()["backend"] == "zeroshot"
+    assert succeeded.json()["backend"] == "rag"
 
 
 def test_classify_reuses_the_cached_pipeline_across_requests(client, monkeypatch):

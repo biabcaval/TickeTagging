@@ -27,10 +27,8 @@ Ticket:
 Return the JSON object now."""
 
 
-def build_messages(ticket: str, categories: tuple[Category, ...]) -> list[dict[str, str]]:
-    """Assemble the chat messages for one zero-shot classification call."""
+def build_prompt(ticket: str, categories: tuple[Category, ...]) -> tuple[str, str]:
+    """Assemble the (system_instruction, user_content) pair for one classification call."""
     listing = "\n".join(category.as_prompt_line() for category in categories)
-    return [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": USER_PROMPT.format(categories=listing, ticket=ticket)},
-    ]
+    user_content = USER_PROMPT.format(categories=listing, ticket=ticket)
+    return SYSTEM_PROMPT, user_content

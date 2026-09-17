@@ -11,7 +11,7 @@ from ..envfile import ENV_FILE, load_env_file
 from ..exceptions import ConfigurationError
 
 API_KEY_ENV_VAR = "CHROMA_API_KEY"
-DEFAULT_COLLECTION_NAME = "ticketag_tickets"
+DEFAULT_COLLECTION_NAME = "tickets"
 
 
 @dataclass(frozen=True, slots=True)

@@ -3,7 +3,7 @@
 Serves one static page (``GET /``) plus a tiny JSON API (``POST
 /api/classify``). Each backend's classifier is expensive or impossible to
 build without configuration (the RAG backend opens a real connection to
-Chroma Cloud; the zero-shot backend needs an OpenRouter key), so neither is
+Chroma Cloud; the zero-shot backend needs a Gemini API key), so neither is
 built until a request actually needs it -- see ``_PipelineCache`` below.
 """
 
@@ -28,10 +28,15 @@ from ..exceptions import (
     KnowledgeBaseError,
     TickeTagError,
 )
+from ..logging_setup import configure_logging
 from ..pipeline import TicketClassificationPipeline
 from ..protocols import TicketClassifier
 from ..rag import classifier_from_env as rag_classifier_from_env
 from ..zeroshot import classifier_from_env as zeroshot_classifier_from_env
+
+ZEROSHOT_PARKED_DETAIL = (
+    "Zero-shot is parked as future work and is disabled in the web UI. Use the RAG backend."
+)
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +144,7 @@ def health() -> dict[str, str]:
     response_model=ClassifyResponse,
     responses={
         400: {"model": ErrorResponse},
+        403: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
         502: {"model": ErrorResponse},
         503: {"model": ErrorResponse},
@@ -146,6 +152,8 @@ def health() -> dict[str, str]:
 )
 def classify(request: ClassifyRequest) -> ClassifyResponse:
     """Classify one ticket with the requested backend and return the full result."""
+    if request.backend == "zeroshot":
+        raise HTTPException(status_code=403, detail=ZEROSHOT_PARKED_DETAIL)
     try:
         pipeline = _cache.get(request.backend)
         result = pipeline.run(request.text)
@@ -175,6 +183,7 @@ def handle_unexpected_error(_request: Request, error: Exception) -> JSONResponse
 
 def run(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None:
     """Start the uvicorn server for the web UI."""
+    configure_logging()
     uvicorn.run(app, host=host, port=port)
 
 

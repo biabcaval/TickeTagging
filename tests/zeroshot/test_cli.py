@@ -19,6 +19,6 @@ def test_parser_applies_the_default_size_guard():
 
 
 def test_parser_accepts_the_backend_specific_model_flag():
-    args = build_parser().parse_args(["--text", "a", "--model", "vendor/model:free"])
+    args = build_parser().parse_args(["--text", "a", "--model", "gemini-2.5-pro"])
 
-    assert args.model == "vendor/model:free"
+    assert args.model == "gemini-2.5-pro"

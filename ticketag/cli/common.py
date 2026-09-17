@@ -9,12 +9,12 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import logging
 import sys
 from collections.abc import Iterator
 from pathlib import Path
 
 from ..exceptions import TickeTagError
+from ..logging_setup import configure_logging as configure_process_logging
 from ..models import ClassifiedTicket, FailedTicket
 from ..pipeline import TicketClassificationPipeline
 from ..text import MAX_TICKET_CHARS
@@ -54,13 +54,9 @@ def build_base_parser(
     return parser
 
 
-def configure_logging(verbose: bool) -> None:
+def configure_logging(verbose: bool = False) -> None:
     """Send progress and warnings to stderr so stdout stays machine readable."""
-    logging.basicConfig(
-        level=logging.DEBUG if verbose else logging.INFO,
-        format="%(levelname)s %(name)s: %(message)s",
-        stream=sys.stderr,
-    )
+    configure_process_logging(verbose)
 
 
 def read_csv_tickets(

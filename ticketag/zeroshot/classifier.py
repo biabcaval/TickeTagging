@@ -12,7 +12,7 @@ from ..models import Classification
 from ..taxonomy import DEFAULT_CATEGORIES, Category
 from .config import Settings
 from .inference import ChatBackend, Transport
-from .prompts import build_messages
+from .prompts import build_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,8 @@ class ZeroShotTicketClassifier:
 
     def classify(self, ticket: str) -> Classification:
         """Return the category and rationale for a ticket."""
-        reply = self._backend.complete(build_messages(ticket, self._categories))
+        system_instruction, user_content = build_prompt(ticket, self._categories)
+        reply = self._backend.complete(system_instruction, user_content)
         payload = _extract_json(reply)
         justification = str(payload.get("justification", "")).strip()
         if not justification:

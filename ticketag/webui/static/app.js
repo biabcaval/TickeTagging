@@ -41,9 +41,9 @@ function showResult(payload) {
   result.hidden = false;
 }
 
-/** Read the selected backend from the radio group. */
+/** Read the selected backend from the radio group. Zero-shot is disabled in the UI. */
 function selectedBackend() {
-  const checked = form.querySelector('input[name="backend"]:checked');
+  const checked = form.querySelector('input[name="backend"]:checked:not(:disabled)');
   return checked ? checked.value : "rag";
 }
 
