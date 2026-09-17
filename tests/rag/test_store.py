@@ -97,7 +97,9 @@ def test_store_from_env_creates_a_cosine_collection(monkeypatch):
         def get_or_create_collection(self, name, metadata):
             calls["name"] = name
             calls["metadata"] = metadata
-            return FakeCollection()
+            collection = FakeCollection()
+            collection.metadata = {"hnsw:space": "cosine"}
+            return collection
 
     monkeypatch.setattr("ticketag.rag.store.chromadb.CloudClient", FakeCloudClient)
     settings = Settings(
@@ -113,3 +115,20 @@ def test_store_from_env_creates_a_cosine_collection(monkeypatch):
     assert calls["client_kwargs"] == {"api_key": "ck-test", "tenant": "t1", "database": "d1"}
     assert calls["name"] == "tickets"
     assert calls["metadata"] == {"hnsw:space": "cosine"}
+
+
+def test_store_from_env_rejects_a_pre_existing_collection_with_a_different_metric(monkeypatch):
+    class FakeCloudClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def get_or_create_collection(self, name, metadata):
+            collection = FakeCollection()
+            collection.metadata = {"hnsw:space": "l2"}
+            return collection
+
+    monkeypatch.setattr("ticketag.rag.store.chromadb.CloudClient", FakeCloudClient)
+    settings = Settings(chroma_api_key="ck-test", collection_name="tickets")
+
+    with pytest.raises(KnowledgeBaseError, match="tickets"):
+        store_from_env(settings)

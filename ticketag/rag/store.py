@@ -122,4 +122,11 @@ def store_from_env(settings: Settings) -> ChromaTicketStore:
     collection = client.get_or_create_collection(
         name=settings.collection_name, metadata=COLLECTION_METADATA
     )
+    metric = (collection.metadata or {}).get("hnsw:space")
+    if metric != "cosine":
+        raise KnowledgeBaseError(
+            f"Collection {settings.collection_name!r} already exists with metric "
+            f"{metric!r}, not 'cosine'. Delete the collection or set "
+            f"TICKETAG_RAG_COLLECTION to a different name."
+        )
     return ChromaTicketStore(collection)
