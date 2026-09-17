@@ -11,6 +11,8 @@ does not let you run it.
 
 See `docs/ARCHITECTURE.md` for the classification graph and layer map.
 
+![TickeTag web UI classifying a ticket with the RAG backend](docs/webui-demo.png)
+
 ## Repository layout
 
 ```
@@ -32,6 +34,7 @@ notebooks/
   backend_evaluation.ipynb # Metrics: RAG vs zero-shot comparison
 docs/
   ARCHITECTURE.md
+  webui-demo.png
 tests/
 ```
 
