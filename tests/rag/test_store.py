@@ -42,6 +42,20 @@ def test_query_wraps_a_backend_failure_in_knowledge_base_error():
         store.query("ticket", k=5)
 
 
+def test_query_wraps_malformed_response_in_knowledge_base_error():
+    collection = FakeCollection(
+        query_result={
+            "ids": [["T-1", "T-2"]],
+            "distances": [[0.1]],
+            "metadatas": [[{"category": "Hardware"}, {"category": "Access"}]],
+        }
+    )
+    store = ChromaTicketStore(collection)
+
+    with pytest.raises(KnowledgeBaseError):
+        store.query("ticket", k=2)
+
+
 def test_add_upserts_a_single_row_with_category_metadata():
     collection = FakeCollection()
     store = ChromaTicketStore(collection)
@@ -115,6 +129,20 @@ def test_store_from_env_creates_a_cosine_collection(monkeypatch):
     assert calls["client_kwargs"] == {"api_key": "ck-test", "tenant": "t1", "database": "d1"}
     assert calls["name"] == "tickets"
     assert calls["metadata"] == {"hnsw:space": "cosine"}
+
+
+def test_store_from_env_wraps_chroma_client_failure_in_knowledge_base_error(monkeypatch):
+    def raise_on_init(**kwargs):
+        raise RuntimeError("invalid api key")
+
+    monkeypatch.setattr(
+        "ticketag.rag.store.chromadb.CloudClient",
+        raise_on_init,
+    )
+    settings = Settings(chroma_api_key="bad-key", collection_name="tickets")
+
+    with pytest.raises(KnowledgeBaseError, match="invalid api key"):
+        store_from_env(settings)
 
 
 def test_store_from_env_rejects_a_pre_existing_collection_with_a_different_metric(monkeypatch):

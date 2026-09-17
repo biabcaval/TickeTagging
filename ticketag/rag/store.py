@@ -66,15 +66,15 @@ class ChromaTicketStore:
             result = self._collection.query(
                 query_texts=[text], n_results=k, include=["metadatas", "distances"]
             )
+            ids = (result.get("ids") or [[]])[0]
+            distances = (result.get("distances") or [[]])[0]
+            metadatas = (result.get("metadatas") or [[]])[0]
+            return [
+                Neighbor(str(ticket_id), str((metadata or {}).get("category", "")), 1.0 - distance)
+                for ticket_id, distance, metadata in zip(ids, distances, metadatas, strict=True)
+            ]
         except Exception as error:
             raise KnowledgeBaseError(f"Chroma query failed: {error}") from error
-        ids = (result.get("ids") or [[]])[0]
-        distances = (result.get("distances") or [[]])[0]
-        metadatas = (result.get("metadatas") or [[]])[0]
-        return [
-            Neighbor(str(ticket_id), str((metadata or {}).get("category", "")), 1.0 - distance)
-            for ticket_id, distance, metadata in zip(ids, distances, metadatas, strict=True)
-        ]
 
     def add(self, ticket_id: str, text: str, category: str) -> None:
         """Insert or overwrite a single labeled ticket."""
@@ -114,14 +114,17 @@ class ChromaTicketStore:
 
 def store_from_env(settings: Settings) -> ChromaTicketStore:
     """Connect to Chroma Cloud and wrap the tuned collection."""
-    client = chromadb.CloudClient(
-        api_key=settings.chroma_api_key,
-        tenant=settings.chroma_tenant,
-        database=settings.chroma_database,
-    )
-    collection = client.get_or_create_collection(
-        name=settings.collection_name, metadata=COLLECTION_METADATA
-    )
+    try:
+        client = chromadb.CloudClient(
+            api_key=settings.chroma_api_key,
+            tenant=settings.chroma_tenant,
+            database=settings.chroma_database,
+        )
+        collection = client.get_or_create_collection(
+            name=settings.collection_name, metadata=COLLECTION_METADATA
+        )
+    except Exception as error:
+        raise KnowledgeBaseError(f"Could not open Chroma collection: {error}") from error
     metric = (collection.metadata or {}).get("hnsw:space")
     if metric != "cosine":
         raise KnowledgeBaseError(
