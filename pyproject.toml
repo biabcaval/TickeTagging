@@ -1,0 +1,39 @@
+[build-system]
+requires = ["uv_build>=0.8,<0.9"]
+build-backend = "uv_build"
+
+[project]
+name = "ticketag"
+version = "0.1.0"
+description = "Support ticket classification with a justification for every decision"
+requires-python = ">=3.12"
+# No runtime dependencies: the OpenRouter call is a plain JSON POST over urllib.
+dependencies = []
+
+[project.scripts]
+ticketag-zeroshot = "ticketag.cli.zeroshot:main"
+
+[dependency-groups]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[tool.uv.build-backend]
+module-name = "ticketag"
+module-root = ""
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RET", "D"]
+ignore = ["D105", "D107", "D203", "D213"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

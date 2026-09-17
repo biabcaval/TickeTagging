@@ -1,0 +1,15 @@
+all_tickets_processed_improved_v3.csv
+.env
+.venv/
+Escolhas_projeto.md
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+predictions*.csv
+predictions*.json
+
