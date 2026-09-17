@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from ticketag.cli.common import read_csv_tickets, write_results
+from ticketag.cli.common import build_base_parser, read_csv_tickets, write_results
 from ticketag.exceptions import TickeTagError
 from ticketag.models import Classification, ClassifiedTicket, FailedTicket
 
@@ -52,3 +52,18 @@ def test_write_results_emits_json_file(tmp_path):
     write_results(results, output)
 
     assert json.loads(output.read_text())[0]["justification"] == "VPN login blocked."
+
+
+def test_build_base_parser_includes_the_category_flag_by_default():
+    parser = build_base_parser("prog", "desc")
+
+    args = parser.parse_args(["--text", "a", "--category", "Hardware"])
+
+    assert args.categories == ["Hardware"]
+
+
+def test_build_base_parser_omits_the_category_flag_when_disabled():
+    parser = build_base_parser("prog", "desc", include_categories=False)
+
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--text", "a", "--category", "Hardware"])

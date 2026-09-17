@@ -22,7 +22,9 @@ from ..text import MAX_TICKET_CHARS
 OUTPUT_FIELDS = ("ticket_id", "category", "justification", "confidence", "error")
 
 
-def build_base_parser(prog: str, description: str) -> argparse.ArgumentParser:
+def build_base_parser(
+    prog: str, description: str, *, include_categories: bool = True
+) -> argparse.ArgumentParser:
     """Define the flags every backend accepts; callers add their own on top."""
     parser = argparse.ArgumentParser(prog=prog, description=description)
     source = parser.add_mutually_exclusive_group(required=True)
@@ -33,13 +35,14 @@ def build_base_parser(prog: str, description: str) -> argparse.ArgumentParser:
     parser.add_argument("--id-column", help="CSV column to use as ticket id")
     parser.add_argument("--limit", type=int, help="Classify only the first N CSV rows")
     parser.add_argument("--output", type=Path, help="Write results to this .csv or .json file")
-    parser.add_argument(
-        "--category",
-        action="append",
-        dest="categories",
-        metavar="NAME[:DESCRIPTION]",
-        help="Override the taxonomy, repeat once per category",
-    )
+    if include_categories:
+        parser.add_argument(
+            "--category",
+            action="append",
+            dest="categories",
+            metavar="NAME[:DESCRIPTION]",
+            help="Override the taxonomy, repeat once per category",
+        )
     parser.add_argument("--workers", type=int, default=4, help="Concurrent requests for CSV input")
     parser.add_argument(
         "--max-chars",
