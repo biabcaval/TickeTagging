@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TickeTag &mdash; Ticket Classifier</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="page__header">
+        <div class="brand">
+          <span class="brand__mark">TT</span>
+          <div class="brand__text">
+            <h1>TickeTag</h1>
+            <p>Classify a support ticket and see why the model picked its category.</p>
+          </div>
+        </div>
+      </header>
+
+      <section class="card">
+        <form id="classify-form" class="form" novalidate>
+          <label class="field">
+            <span class="field__label">Ticket text</span>
+            <textarea
+              id="ticket-text"
+              name="text"
+              class="field__textarea"
+              placeholder="Paste or type the ticket body here..."
+              rows="8"
+              required
+            ></textarea>
+          </label>
+
+          <fieldset class="field field--backend">
+            <legend class="field__label">Backend</legend>
+            <div class="segmented" role="radiogroup" aria-label="Classification backend">
+              <label class="segmented__option">
+                <input type="radio" name="backend" value="rag" checked />
+                <span>RAG</span>
+              </label>
+              <label class="segmented__option">
+                <input type="radio" name="backend" value="zeroshot" />
+                <span>Zero-shot</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <button type="submit" id="submit-button" class="button button--primary">
+            Classify ticket
+          </button>
+        </form>
+
+        <div id="error-banner" class="banner banner--error" hidden></div>
+
+        <div id="result" class="result" hidden>
+          <div class="result__row">
+            <span class="result__label">Backend</span>
+            <span id="result-backend" class="pill"></span>
+          </div>
+          <div class="result__row">
+            <span class="result__label">Category</span>
+            <span id="result-category" class="pill pill--accent"></span>
+          </div>
+          <div class="result__row result__row--confidence">
+            <span class="result__label">Confidence</span>
+            <div class="confidence">
+              <div class="confidence__track">
+                <div id="confidence-fill" class="confidence__fill"></div>
+              </div>
+              <span id="result-confidence" class="confidence__value"></span>
+            </div>
+          </div>
+          <div class="result__row result__row--justification">
+            <span class="result__label">Justification</span>
+            <p id="result-justification" class="result__justification"></p>
+          </div>
+        </div>
+      </section>
+
+      <footer class="page__footer">
+        <span>No history is kept &mdash; each submission is a single, independent request.</span>
+      </footer>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
